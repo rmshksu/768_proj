@@ -128,7 +128,7 @@ Coupling agent-based simulation and spatial optimization models to underﬆand s
 
   - This could help us inform our construction of the process model better? Agent-based modeling is a little extreme though. We'd have to make that our primary goal if we really wanted to jump to that. Open to thoughts:
  
-| Do we consider Agent-Based Modeling? | Y/N (ELI) | Y/N (Stephen) | 
+| Do we consider Agent-Based Modeling? | Y/N (ELI) | Y/N (STEPHEN) | 
 
 - I did snag the data for this (I think? It had the authors name on it so I think.)
 
