@@ -30,7 +30,7 @@ Identifying and Informing Strategies for Disrupting Drug Distribution Networks: 
 
 - There's something to be said about treating the possible permutations of connections across a network of unobserved connections as a way to generate some causal results. It's probably been done before but it's worth digging into. (OPEN FOR UPDATE PLEASE HOLD ME ACCOUNTABLE)
 
-- Possibility for a framework of primary prevention as an S-I-A-S-R model: an S-I-S model where members of the population can die (R==Removed) or become educated and aware of the drug/overdose epidemic (A==Aware). It's an interesting concept when you consider that members of the A-Aware group would be able to spread awareness and provide community support, in turn "spreading" their affect to neighboring nodes.
+- Possibility for a framework of primary prevention as an S-I-A-S-R model: an S-I-S model where members of the population can die (R==Removed) or become educated and aware of the drug/overdose epidemic (A==Aware). It's an interesting concept when you consider that members of the A-Aware group would be able to spread awareness and provide community support, in turn "spreading" their affect to neighboring nodes
  
 - Slight complication comes into play with the idea of race affecting probability of interaction
 
