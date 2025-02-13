@@ -3,9 +3,13 @@ Final project for STAT 768 at KSU, Applied Bayesian Modeling and Prediction
 
 Data we need N_drugs -> # of deaths and also N_users -> # of users
 We need an estimate of the number of users seeking drugs in Kansas (need sources for number of users seeking drugs in Kansas)
+
 [z|y] =[y] 
+
 [y|N_i,P_i] ~ Binom(N_i, P_i) 
+
 [N_i| lambda ] ~ Pois(lambda)
+
 [P_i|a,b] ~ Beta(a,B) 
 
 
