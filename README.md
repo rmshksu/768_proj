@@ -12,7 +12,7 @@ We need an estimate of the number of users seeking drugs in Kansas (need sources
 
 [P_i|a,b] ~ Beta(a,B) 
 
-
+The network comes in at P, the network is a parameter model for P. 
 
 We can estimate lambda from the data or assume it
 
