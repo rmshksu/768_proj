@@ -4,12 +4,19 @@ Final project for STAT 768 at KSU, Applied Bayesian Modeling and Prediction
 
 
 [z_t|y_t] ~ Binom(N_t | p_t)
+
 [y_t|mu_t, phi_t] ~ NegBin(mu_t,phi_t)
+
 [mu_t|lambda_t] ~ Pois(lambda_t)
+
 [p_t|a,b] = beta(alpha,beta)
+
 lambda_t = e^{XB}
+
 a=1
+
 B=1
+
 phi_t
 
 
