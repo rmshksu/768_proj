@@ -2,13 +2,16 @@ room 10 wednesday 230
 # 768_proj
 Final project for STAT 768 at KSU, Applied Bayesian Modeling and Prediction
 
-Data we need N_drugs -> # of deaths (we have) and also N_users -> # of users
-We need an estimate of the number of users seeking drugs in Kansas (need sources for number of users seeking drugs in Kansas)
 
-z_t is the true overdose count 
-y_t is the observed overdose count
-[z_t|y_t] = NB(y_t, phi_t) 
-[y_t|lambda_t] = Pois(lambda_t)
+[z_t|y_t] ~ Binom(N_t | p_t)
+[y_t|mu_t, phi_t] ~ NegBin(mu_t,phi_t)
+[mu_t|lambda_t] ~ Pois(lambda_t)
+[p_t|a,b] = beta(alpha,beta)
+lambda_t = e^{XB}
+a=1
+B=1
+phi_t
+
 
 Here lambda is associated with supply chain network with weights
 [lambda_t] = [something with networks]
