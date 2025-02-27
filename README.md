@@ -2,7 +2,7 @@ room 10 wednesday 230
 # 768_proj
 Final project for STAT 768 at KSU, Applied Bayesian Modeling and Prediction
 
-Data we need N_drugs -> # of deaths and also N_users -> # of users
+Data we need N_drugs -> # of deaths (we have) and also N_users -> # of users
 We need an estimate of the number of users seeking drugs in Kansas (need sources for number of users seeking drugs in Kansas)
 
 z_t is the true overdose count 
