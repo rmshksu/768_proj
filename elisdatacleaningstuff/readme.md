@@ -1,6 +1,9 @@
 The resulting data file is in result.csv
 
 Death column and Rate columns come from https://www.cdc.gov/nchs/pressroom/sosmap/drug_poisoning_mortality/drug_poisoning.htm in the Data folder in this github respository with its corresponding years and state
+Population Data from the annual.csv and the wymoning.pop.data data object come from FRED 
+For example 
+![image](https://github.com/user-attachments/assets/b941291e-cde5-4428-9901-0b021682ed40)
 
 Instructions.
 
