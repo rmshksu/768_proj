@@ -1,5 +1,7 @@
 The resulting data file is in result.csv
 
+Death column and Rate columns come from https://www.cdc.gov/nchs/pressroom/sosmap/drug_poisoning_mortality/drug_poisoning.htm in the Data folder in this github respository with its corresponding years and state
+
 Instructions.
 
 File structure: Make sure in a folder you have the following files
