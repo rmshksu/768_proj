@@ -4,7 +4,7 @@ Death column and Rate columns come from https://www.cdc.gov/nchs/pressroom/sosma
 Population Data from the annual.csv and the wymoning.pop.data data object come from FRED 
 For example 
 ![image](https://github.com/user-attachments/assets/b941291e-cde5-4428-9901-0b021682ed40)
-
+Other columns such as PERCENTBACHELORSDEGREEORHIGHER and STATEGOVTAXCOLLECTIONSTOTALTAXES are data from FRED. 
 Instructions.
 
 File structure: Make sure in a folder you have the following files
