@@ -1,3 +1,5 @@
+The resulting data file is in result.csv
+
 Instructions.
 
 File structure: Make sure in a folder you have the following files
