@@ -8,7 +8,7 @@ fredPCPISTATE.R
 fredTOTLTAXSTATE.R
 datacleaning.R
 annual.csv
-DOMBS_2020
+DOMBS_2020.csv
 
 And then run datacleaning.R 
 Important: errors in file paths - look at datacleaning.R 
