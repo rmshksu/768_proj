@@ -17,7 +17,7 @@ a=1
 
 B=1
 
-phi_t
+phi_t ~ unif()
 
 
 Here lambda is associated with supply chain network with weights
