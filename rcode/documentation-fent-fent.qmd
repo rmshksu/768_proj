@@ -1,0 +1,1045 @@
+---
+title: "N-mixture models for Fentanyl Overdose - Code Documentation"
+format: html
+editor: visual
+embed-resources: true
+---
+
+## Libraries
+
+To replicate our results you will need $5$ libraries and [JAGs](https://sourceforge.net/projects/mcmc-jags/).
+
+The libraries include:
+
+-   `mgcv` for the `gam()` function to fit GAMs and GLMs
+
+-   `glmnet` for the `glmnet()` function for ridge regression
+
+-   `latex2exp` to replicate our plot labels (not necessary but direct replication implies it)
+
+-   `dclone` and `rjags` to fit the bayesian models
+
+```{r}
+#| include: false
+library(mgcv)
+library(glmnet)
+library(latex2exp)
+library(dclone) 
+library(rjags)
+```
+
+```{r}
+#| eval: false
+library(mgcv)
+library(glmnet)
+library(latex2exp)
+library(dclone) 
+library(rjags)
+```
+
+<br>
+
+## Variable Selection
+
+The following seed was used throughout for reproducibility:
+
+```{r}
+set.seed(78)
+```
+
+<br>
+
+The data is kept in a .csv found via [this github link](https://github.com/rmshksu/768_proj/blob/607da4c5a0366b44935eb62452a1d4f522a6abfd/elisdatacleaningstuff/result.csv)
+
+```{r}
+data=read.csv("result.csv") # read in data
+head(data) # first five rows of each column
+```
+
+<br>
+
+A common trend throughout is the usage of separate data objects to allow for cleaning of the data without having to re-introduce the original data later on. This is done because of the sheer number of transformations and re-scales that occur to make this all possible.
+
+```{r}
+selection=data
+selection$YEAR=selection$YEAR-2013
+selection$STATE=as.factor(selection$YEAR)
+select_X=as.matrix(selection[,-5])
+select_Y=selection[,5]
+```
+
+<br>
+
+Ridge regression was used for two reasons: (1) I could interpret it (2) it worked reliably. The `glmnet()` package allows for use of LASSO or elastic net if you would like to investigate those. Simply set `alpha=0.5` for elastic net and `alpha=1` for LASSO.
+
+```{r}
+ridge=glmnet(select_X,select_Y,,alpha=0)
+cv_ridge=cv.glmnet(select_X,select_Y,,alpha=0)
+best_lambda=cv_ridge$lambda.min
+final=glmnet(select_X,select_Y,,alpha=0,lambda=best_lambda)
+coef_select=coef(final)
+```
+
+```{r}
+coef_select
+```
+
+<br>
+
+As often as possible this code tries to clear the environment of unnecessary objects:
+
+```{r}
+rm("selection")
+rm("select_X")
+rm("select_Y")
+rm("ridge")
+rm("cv_ridge")
+rm("best_lambda")
+```
+
+<br>
+
+## Data Cleaning and Preparation
+
+The data cleaning and preparation process is meant to achieve the following:
+
+1.  Reformat and scale the data
+
+```{r}
+rescale=data # separate original data set from transformed data
+# transform years such that 2014 is year 1
+rescale$YEAR=(data$YEAR-2013)
+# scale gdp to 10 millions
+rescale$GROSSDOMESTICPRODUCT=data$GROSSDOMESTICPRODUCT/(10^5) 
+# add in states as factors
+rescale$STATE=as.factor(data$STATE)
+```
+
+<br>
+
+2.  Split the data into a training and testing set
+
+```{r}
+dtr=subset(rescale,rescale$YEAR<6) # training data set
+dts=subset(rescale,rescale$YEAR>5) # testing data set
+```
+
+<br>
+
+3.  Isolate the response
+
+```{r}
+ytr=dtr$DEATHS # training response
+yts=dts$DEATHS # testing response
+Y=ytr # set the training response as Y
+```
+
+<br>
+
+4.  Build the final data set for model fitting
+
+```{r}
+X=data.frame(nID=as.numeric(dtr$STATE),
+             rID=dtr$STATE,
+             x1=dtr$GROSSDOMESTICPRODUCT,
+             x2=dtr$PERCENTBACHELORSDEGREEORHIGHER,
+             x3=dtr$YEAR,
+             x4=dtr$HOMEOWNERSHIPRATE) 
+```
+
+<br>
+
+5.  Build the final data for model testing
+
+```{r}
+tX=data.frame(nID=as.numeric(dts$STATE),
+              rID=dts$STATE,
+              x1=dts$GROSSDOMESTICPRODUCT,
+              x2=dts$PERCENTBACHELORSDEGREEORHIGHER,
+              x3=dts$YEAR,
+              x4=dts$HOMEOWNERSHIPRATE)
+```
+
+<br>
+
+<br>
+
+## GLMs
+
+By fitting a `gam()` object to data with the syntax of the `glm()` function we achieve the exact same result as a GLM. Hence for simplicity we stick to using the `gam()` function for both GAMs and GLMs.
+
+A linear model can be fit for comparison, however it is assumed to be a simple enough procedure that documentation on it is not included.
+
+For the sake of prediction later on a dataframe of variables is convenient here:
+
+```{r}
+# intercept only
+glm1=gam(Y~1,family=poisson(link="log"))
+
+# ridge selected
+glm2=gam(Y~rID+x1+x3+x4-1,family=poisson(link="log"),data=X)
+
+# dag selected
+glm3=gam(Y~rID+x1+x2+x3-1,family=poisson(link="log"),data=X)
+```
+
+<br>
+
+## GAMs
+
+Different smoothing terms and functions can be selected, these are just the simplest and best understood by the authors. `x3`, which represents years, and `rID`, which represents states, were not smoothed.
+
+```{r}
+# ridge selected
+gam1=gam(Y~rID+s(x1,bs="tp")+x3+
+           s(x4,bs="tp"),family=poisson(link="log"),data=X)
+
+# dag selected
+gam2=gam(Y~rID+s(x1,bs="tp")+
+           s(x2,bs="tp")+x3,family=poisson(link="log"),data=X)
+```
+
+<br>
+
+## N-mixture Models
+
+Below are the variables that control the number of iterations and thinning that occurs with the MCMC algorithms. The values they're set at are the ones we used, however feel free to change them.
+
+```{r}
+mcmc_iterations=100000
+mcmc_thinning=10
+```
+
+<br>
+
+We fit 3 versions of the N-mixture:
+
+1.  Intercept only Poisson N-mixture
+
+2.  Poisson N-mixture using DAG selected variables
+
+3.  Negative Binomial N-mixture using DAG selected variables
+
+<br>
+
+Values of $N$ were saved during initial testing but left out for the final product as we aren't making inference from those $N$ values and removing them from the sample saving process sped up the MCMC algorithms dramatically.
+
+<br>
+
+```{r}
+S=50
+# intercept only poisson N-mixture
+nmm1=function(){
+
+  # process model
+  for(i in 1:n){
+    y[i] ~ dbinom(p[ID[i]],N[i]) # [y|N,p]=binom(N,p)
+    N[i] ~ dpois(lambda[i]) # [N|lambda]=pois(lambda)
+    lambda[i] <- exp(gamma0[ID[i]]) # estimate lambda from log link
+  }
+  
+  # priors
+  for(s in 1:S){ # assume independence across all states
+    gamma0[s] ~ dnorm(0,10) # assume normality on gamma
+    p[s] ~ dbeta(a,b) # [p|a,b]=beta(a,b)
+  }
+  
+  # fixed priors on alpha and beta
+  a <- 1
+  b <- 1
+}
+
+# data we're fitting
+jags_data=list(y=Y,ID=X$nID,n=nrow(X),S=50)
+
+# initial proposal values
+inits=list(gamma0=rep(0,50))
+
+# saved parameters
+par=c("gamma0","p")
+
+# fit the model
+nmm1_mcmc=jags.fit(jags_data,par,nmm1,inits,
+                   n.adapt=5000,n.update=5000,n.iter=mcmc_iterations,
+                   thin=mcmc_thinning,n.chains=1)
+```
+
+<br>
+
+### DAG Poisson N-mix
+
+```{r}
+# poisson n-mixture using dag parameters
+nmm2=function(){
+
+  # process model   
+  for(i in 1:n){
+    y[i] ~ dbinom(p[ID[i]],N[i]) # [y|N,p]=binom(N,p)
+    N[i] ~ dpois(lambda[i]) # [N|lambda]=pois(lambda)
+    # estimate lambda from log link
+    lambda[i] <- exp(gamma0[ID[i]]+gamma1[ID[i]]*x1[i]+
+                       gamma2[ID[i]]*x2[i]+gamma3[ID[i]]*x3[i])
+  }
+  
+  # priors
+  for(s in 1:S){ # assume independence across all states
+    # assume normality on all gammas
+    gamma0[s] ~ dnorm(0,10)
+    gamma1[s] ~ dnorm(0,10)
+    gamma2[s] ~ dnorm(0,10)
+    gamma3[s] ~ dnorm(0,10)
+    p[s] ~ dbeta(a,b) # [p|a,b]=beta(a,b)
+  }
+  
+  # fixed priors on alpha and beta
+  a <- 1 
+  b <- 1
+}
+
+# data we're fitting
+jags_data=list(y=Y,x1=X$x1,x2=X$x2,x3=X$x3,ID=X$nID,n=nrow(X),S=50)
+
+# initial proposal values
+inits=list(gamma0=rep(0,50),gamma1=rep(0,50),
+           gamma2=rep(0,50),gamma3=rep(0,50),p=rep(0.3,50))
+
+# saved parameters
+par=c("gamma0","gamma1","gamma2","gamma3","p")
+
+# fit the model
+nmm2_mcmc=jags.fit(jags_data,par,nmm2,inits,
+                   n.adapt=5000,n.update=5000,n.iter=mcmc_iterations,
+                   thin=mcmc_thinning,n.chains=1)
+```
+
+<br>
+
+### DAG Negative Binomial N-mix
+
+```{r}
+# poisson n-mixture using dag parameters
+nmm3=function(){
+
+  # process model   
+  for(i in 1:n){
+    y[i] ~ dbinom(p[ID[i]],N[i]) # [y|N,p]=binom(N,p)
+    
+    # negative binomial
+    N[i] ~ dpois(lambda[i]*h[ID[i]]) # parameterized as a poisson 
+    # with a mean multiplied by a dispersion parameter
+    # which is modeled by a one parameter gamma 
+    
+    # estimate lambda from log link
+    lambda[i] <- exp(gamma0[ID[i]]+gamma1[ID[i]]*x1[i]+
+                       gamma2[ID[i]]*x2[i]+gamma3[ID[i]]*x3[i])
+  }
+  
+  # priors
+  for(s in 1:S){ # assume independence across all states
+    # assume normality on all gammas
+    gamma0[s] ~ dnorm(0,10)
+    gamma1[s] ~ dnorm(0,10)
+    gamma2[s] ~ dnorm(0,10)
+    gamma3[s] ~ dnorm(0,10)
+    h[s] ~ dgamma(phi,phi) # [h|phi]=gamma(phi,phi)
+    p[s] ~ dbeta(a,b) # [p|a,b]=beta(a,b)
+  }
+  
+  # fixed priors on alpha and beta
+  phi ~ dunif(1,50) # uniform prior on dispersion distribution parameter
+  a <- 1 
+  b <- 1
+}
+
+# data we're fitting
+jags_data=list(y=Y,x1=X$x1,x2=X$x2,x3=X$x3,ID=X$nID,n=nrow(X),S=50)
+
+# initial proposal values
+inits=list(gamma0=rep(0,50),gamma1=rep(0,50),
+           gamma2=rep(0,50),gamma3=rep(0,50),p=rep(0.3,50))
+
+# saved parameters
+par=c("gamma0","gamma1","gamma2","gamma3","p","h")
+
+# fit the model
+nmm3_mcmc=jags.fit(jags_data,par,nmm3,inits,
+                   n.adapt=5000,n.update=5000,n.iter=mcmc_iterations,
+                   thin=mcmc_thinning,n.chains=1)
+```
+
+<br>
+
+<br>
+
+### Save Outputs
+
+The method for saving the outputs of JAGs can be convoluted if you're trying to maintain labels. There are likely better methods, but this one is easy to perform:
+
+```{r}
+# burn in removal
+burn_in=1000
+
+# intercept only Poisson N-mix
+samples1=as.list(as.data.frame(as.matrix(nmm1_mcmc[[1]][-c(1:burn_in),])))
+# dag selected Poisson N-mix
+samples2=as.list(as.data.frame(as.matrix(nmm2_mcmc[[1]][-c(1:burn_in),]))) 
+# dag selected nb N-mix
+samples3=as.list(as.data.frame(as.matrix(nmm3_mcmc[[1]][-c(1:burn_in),])))
+```
+
+<br>
+
+The problem with pulling the results in a way that the labels are maintained is that they become new objects which are difficult to reference in loops. Thus we separate the posteriors of each parameter from each model:
+
+```{r}
+# all gammas
+n1_g0post=nmm1_mcmc[[1]][-c(1:burn_in),c(1:50)]
+n2_g0post=nmm2_mcmc[[1]][-c(1:burn_in),c(1:50)]
+n3_g0post=nmm3_mcmc[[1]][-c(1:burn_in),c(1:50)]
+n2_g1post=nmm2_mcmc[[1]][-c(1:burn_in),c(51:100)]
+n3_g1post=nmm3_mcmc[[1]][-c(1:burn_in),c(51:100)]
+n2_g2post=nmm2_mcmc[[1]][-c(1:burn_in),c(101:150)]
+n3_g2post=nmm3_mcmc[[1]][-c(1:burn_in),c(101:150)]
+n2_g3post=nmm2_mcmc[[1]][-c(1:burn_in),c(151:200)]
+n3_g3post=nmm3_mcmc[[1]][-c(1:burn_in),c(151:200)]
+n2_g4post=nmm2_mcmc[[1]][-c(1:burn_in),c(201:250)]
+n3_g4post=nmm3_mcmc[[1]][-c(1:burn_in),c(201:250)]
+
+# all p's
+n1_ppost=nmm1_mcmc[[1]][-c(1:burn_in),c(51:100)]
+n2_ppost=nmm2_mcmc[[1]][-c(1:burn_in),c(251:300)]
+n3_ppost=nmm3_mcmc[[1]][-c(1:burn_in),c(301:350)]
+
+# h parameter from nb nmix
+n3_hpost=nmm3_mcmc[[1]][-c(1:burn_in),c(251:300)]
+```
+
+<br>
+
+<br>
+
+## Diagnostics
+
+> The issue with these models is now the complexity of their output. Typically a numerical diagnostic would be sufficient to understand the results.
+
+While these N-mixture models are mechanistic they have turned a small data problem (n=5, J=50) into a large data problem (n=10000, J=50). In a way, we've run 3 programs with 50 models inside each program.
+
+Thus we have 150 models worth of regression coefficients.
+
+Summarizing these coefficients in any meaningful way is a challenge on its own. As such, we'll be using some unconventional methods:
+
+<br>
+
+### Regression Coefficients
+
+When we consider our regression coefficient matrix structure as $\gamma_{0_i}^{(j)}$ where $i=1,2,...,50$ and $j=1,2,...,10000$ we can see that we're left with a matrix of dimensions $50 \times 10000$.
+
+We can summarize each row, $i$, by taking the expected value across the columns, $j$. This would leave us with the vector:
+
+$$\gamma_0^{(*)} = \{\mathbb E \gamma_{0_1},\mathbb E \gamma_{0_2},...,\mathbb E \gamma_{0_{50}} \}'$$
+
+```{r}
+E_gamma0_star1=apply(n1_g0post,2,mean)
+E_gamma0_star1[c(1:5)]
+```
+
+<br>
+
+We can consider this vector of expected values to be a distribution, visualizable in a single plot:
+
+```{r}
+par(mar=c(5,5,2,2))
+plot(E_gamma0_star1,xaxt="n",las=1,xlab="State",
+     ylab=TeX("Expected value of $\\gamma_0^{(*)}$"),
+     main="State Level Baseline Effect for N-Mix Model 1",
+     pch=20,cex=1.2)
+axis(1,1:50,levels(X$rID))
+```
+
+<br>
+
+We finish this explanation by introducing uncertainty in our estimates via credible intervals:
+
+```{r}
+CI_gamma0_star1=apply(n1_g0post,2,quantile,c(0.025,0.975))
+CI_gamma0_star1[,c(1:5)]
+```
+
+<br>
+
+Forming all of this into a single dataframe:
+
+```{r}
+df_g0star1=data.frame(Lower=CI_gamma0_star1[1,],
+                      Mean=E_gamma0_star1,
+                      Upper=CI_gamma0_star1[2,])
+```
+
+<br>
+
+Everything can be plotted out accordingly:
+
+```{r}
+par(mar=c(5,5,2,2))
+plot(1:50,df_g0star1$Mean,ylim=range(df_g0star1),pch=20,xaxt='n',
+     xlab="State",
+     ylab=TeX("Expected value of $\\gamma_0^{(*)}$"),
+     main="State Level Baseline Effect for N-Mix Model 1",
+     col="#51288890",cex=1.2)
+
+axis(1,1:50,levels(dtr$STATE))
+
+segments(1:50,df_g0star1$Lower,1:50,df_g0star1$Upper,lwd=2)
+
+legend("topright",legend=c("Expected Value","Credible Interval"),pch=c(20,NA),
+       lty=c(NA,1),col=c("#51288890","black"),pt.cex=2,cex=0.6,bty="o",
+       box.lwd=0.5,box.col="gray70",bg="#FFFFFFAA")
+```
+
+<br>
+
+The other two models can be done similarly:
+
+```{r}
+df_g0star2=data.frame(Lower=apply(n2_g0post,2,quantile,0.025),
+                      Mean=apply(n2_g0post,2,mean),
+                      Upper=apply(n2_g0post,2,quantile,0.975))
+
+df_g0star3=data.frame(Lower=apply(n3_g0post,2,quantile,0.025),
+                      Mean=apply(n3_g0post,2,mean),
+                      Upper=apply(n3_g0post,2,quantile,0.975))
+```
+
+<br>
+
+```{r}
+par(mar=c(5,5,2,2))
+plot(1:50,df_g0star2$Mean,ylim=range(df_g0star2),pch=20,xaxt='n',
+     xlab="State",
+     ylab=TeX("Expected value of $\\gamma_0^{(*)}$"),
+     main="State Level Baseline Effect for N-Mix Model 2",
+     col="#51288890",cex=1.2)
+
+axis(1,1:50,levels(dtr$STATE))
+
+segments(1:50,df_g0star2$Lower,1:50,df_g0star2$Upper,lwd=2)
+
+legend("topright",legend=c("Expected Value","Credible Interval"),pch=c(20,NA),
+       lty=c(NA,1),col=c("#51288890","black"),pt.cex=2,cex=0.6,bty="o",
+       box.lwd=0.5,box.col="gray70",bg="#FFFFFFAA")
+```
+
+<br>
+
+```{r}
+par(mar=c(5,5,2,2))
+plot(1:50,df_g0star3$Mean,ylim=range(df_g0star3),pch=20,xaxt='n',
+     xlab="State",
+     ylab=TeX("Expected value of $\\gamma_0^{(*)}$"),
+     main="State Level Baseline Effect for N-Mix Model 3",
+     col="#51288890",cex=1.2)
+
+axis(1,1:50,levels(dtr$STATE))
+
+segments(1:50,df_g0star3$Lower,1:50,df_g0star3$Upper,lwd=2)
+
+legend("topright",legend=c("Expected Value","Credible Interval"),pch=c(20,NA),
+       lty=c(NA,1),col=c("#51288890","black"),pt.cex=2,cex=0.6,bty="o",
+       box.lwd=0.5,box.col="gray70",bg="#FFFFFFAA")
+```
+
+<br>
+
+An analog can be developed for the GLMs, however this measures the effect of the states themselves:
+
+```{r}
+df_g0g2=data.frame(Lower=coef(glm2)[c(1:50)]-(2*summary(glm2)$se[c(1:50)]),
+                   MLE=coef(glm2)[c(1:50)],
+                   Upper=coef(glm2)[c(1:50)]+(2*summary(glm2)$se[c(1:50)]))
+```
+
+<br>
+
+```{r}
+par(mar=c(5,5,2,2))
+plot(1:50,df_g0g2$MLE,ylim=range(df_g0g2),pch=20,xaxt='n',
+     xlab="State",
+     ylab=TeX("$\\hat{\\gamma}_{1_{MLE}}$"),
+     main="State Level Effect for GLM 2",
+     col="#51288890",cex=1.2)
+
+axis(1,1:50,levels(dtr$STATE))
+
+segments(1:50,df_g0g2$Lower,1:50,df_g0g2$Upper,lwd=2)
+
+legend("topright",legend=c("MLE","Confidence Interval"),pch=c(20,NA),
+       lty=c(NA,1),col=c("#51288890","black"),pt.cex=2,cex=0.6,bty="o",
+       box.lwd=0.5,box.col="gray70",bg="#FFFFFFAA")
+```
+
+<br>
+
+### Posterior Distributions
+
+The exact same method is usable with our posterior distributions, only instead we map them as the full distribution rather than summarizing. We do this via "violin plots":
+
+```{r}
+states=levels(dtr$STATE)
+ns=50
+
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(n1_ppost),
+     xlab="State",ylab="p",xaxt="n",main=TeX("$\\[ p| \\cdot \\]$ per State for N-Mix 1"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(n1_ppost[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(n2_ppost),
+     xlab="State",ylab="p",xaxt="n",main=TeX("$\\[ p| \\cdot \\]$ per State for N-Mix 2"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(n2_ppost[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(n3_ppost),
+     xlab="State",ylab="p",xaxt="n",main=TeX("$\\[ p| \\cdot \\]$ per State for N-Mix 3"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(n3_ppost[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(n3_ppost),
+     xlab="State",ylab="h",xaxt="n",main=TeX("$\\[ h| \\cdot \\]$ per State for N-Mix 3"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(n3_ppost[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+<br>
+
+## Prediction
+
+### Posterior Prediction
+
+We can also perform posterior prediction using our held out testing data:
+
+**Intercept-only Poisson N-mixture**
+
+```{r}
+K=dim(n1_g0post)[1]
+n=dim(tX)[1]
+post_pred1=matrix(,S,K)
+for(k in 1:K){
+  # regression samples
+  gamma0_post=n1_g0post[k,]
+  # p samples
+  p_post=n1_ppost[k,]
+  
+  lambda_post=exp(gamma0_post)
+  # lambda samples
+  
+  # prediction across all states and time steps
+  N_post=rpois(50,lambda_post)
+  y_post=rbinom(50,N_post,p_post)
+  post_pred1[,k]=y_post
+}
+```
+
+<br>
+
+**DAG Poisson N-mixture**
+
+```{r}
+lambda_save2=matrix(,n,K)
+N_save2=matrix(,n,K)
+post_pred2=matrix(,n,K)
+for(k in 1:K){
+  # regression samples
+  gamma0_post=n2_g0post[k,]
+  gamma1_post=n2_g1post[k,]
+  gamma2_post=n2_g2post[k,]
+  gamma3_post=n2_g3post[k,]
+  gamma4_post=n2_g4post[k,]
+  
+  # p samples
+  p_post=n1_ppost[k,]
+  
+  for (i in 1:n){ # again, assuming independence across states
+    
+    s=tX$nID[i] # definition of state index
+    
+    # (very bad assumption btw, extremely uncomfortable)
+    # it is what it is, the researchers who held the data we needed
+    # wanted to start publication work now now now
+    # ya im looking at you. per my last email man. cmon.
+    
+    x1=tX$x1[i]
+    x2=tX$x2[i]
+    x3=tX$x3[i]
+    x4=tX$x4[i]
+    
+    # estimate lambdas
+    lambda_i=exp(gamma0_post[s]+gamma1_post[s]*x1+gamma2_post[s]*x2+
+                   gamma3_post[s]*x3+gamma4_post[s]*x4)
+    
+    lambda_save2[i,k]=lambda_i
+    
+    # prediction across all states and time steps
+    N_i=rpois(1,lambda_i)
+    y_i=rbinom(1,N_i,p_post[s])
+    
+    N_save2[i,k]=N_i
+    post_pred2[i,k]=y_i
+  }
+}
+```
+
+<br>
+
+**DAG Negative Binomial N-mixture**
+
+```{r}
+lambda_save3=matrix(,n,K)
+N_save3=matrix(,n,K)
+post_pred3=matrix(,n,K)
+for(k in 1:K){
+  # regression samples
+  gamma0_post=n3_g0post[k,]
+  gamma1_post=n3_g1post[k,]
+  gamma2_post=n3_g2post[k,]
+  gamma3_post=n3_g3post[k,]
+  gamma4_post=n3_g4post[k,]
+  
+  # p samples
+  p_post=n3_ppost[k,]
+  
+  # h samples
+  h_post=n3_hpost[k,]
+  
+  for (i in 1:n){
+    
+    s=tX$nID[i] # definition of state index
+    
+    # imagine if the assumption of independence doesn't fucking matter
+    # id actually just hang it up
+    # go home
+    # crack open a cold one
+    # play oblivion and crank it
+    # go back to real estate
+    # "per my last email— the slide deck cannot include the entire data set"
+    # "because it can't all fit on there. did you not. why do you make more than me"
+    
+    x1=tX$x1[i]
+    x2=tX$x2[i]
+    x3=tX$x3[i]
+    x4=tX$x4[i]
+    
+    # estimate lambdas
+    lambda_i=exp(gamma0_post[s]+gamma1_post[s]*x1+gamma2_post[s]*x2+
+                   gamma3_post[s]*x3+gamma4_post[s]*x4)
+    
+    lambda_save3[i,k]=lambda_i
+    
+    # prediction across all states and time steps
+    N_i=rpois(1,lambda_i*h_post[s])
+    y_i=rbinom(1,N_i,p_post[s])
+    
+    N_save3[i,k]=N_i
+    post_pred3[i,k]=y_i
+  }
+}
+```
+
+<br>
+
+We can leverage violin plots again to report the posterior predictions:
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(post_pred1),
+     xlab="State",ylab="N",xaxt="n",main=TeX("$\\[N| \\cdot \\]$ per State for N-Mix 1"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(post_pred1[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(post_pred2),
+     xlab="State",ylab="N",xaxt="n",main=TeX("$\\[N| \\cdot \\]$ per State for N-Mix 2"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(post_pred2[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+```{r}
+plot(1,type="n",xlim=c(0.5,ns+0.5),ylim=range(post_pred3),
+     xlab="State",ylab="N",xaxt="n",main=TeX("$\\[N| \\cdot \\]$ per State for N-Mix 3"))
+axis(1,at=1:ns,labels=states)
+
+for (i in 1:ns) {
+  d=density(post_pred3[,i])
+  x_left=i-d$y/max(d$y)*0.4
+  x_right=i+d$y/max(d$y)*0.4
+  polygon(c(x_left,rev(x_right)),c(d$x,rev(d$x)),col="#51288890",border=NA)
+  lines(rep(i,2),range(d$x),col="black",lty=3)
+}
+```
+
+<br>
+
+<br>
+
+### Out-of-Sample Validation
+
+A simple method for evaluating model predictive accuracy is by comparing the results of out of sample prediction against the true values of the response from the hold out data.
+
+Root mean squared error is our preferred method for validation, but mean absolute error is very easy to communicate and thus was included.
+
+<br>
+
+```{r}
+# glms
+E_yhatglm1=exp(predict.gam(glm1))[-c(201:250)]
+E_yhatglm2=exp(predict.gam(glm2,newdata=tX))
+E_yhatglm3=exp(predict.gam(glm3,newdata=tX))
+
+# gams
+E_yhatgam1=exp(predict.gam(gam1,newdata=tX))
+E_yhatgam2=exp(predict.gam(gam2,newdata=tX))
+
+# n-mixtures
+E_yhatn1=apply(post_pred1,1,mean) # intercept only
+E_yhatn2=apply(post_pred2,1,mean) # poisson
+E_yhatn3=apply(post_pred3,1,mean) # negative binomial
+```
+
+<br>
+
+```{r}
+# root mean squared error
+rmse_glm1=sqrt(mean((yts-E_yhatglm1)^2))
+rmse_glm2=sqrt(mean((yts-E_yhatglm2)^2))
+rmse_glm3=sqrt(mean((yts-E_yhatglm3)^2))
+
+rmse_gam1=sqrt(mean((yts-E_yhatgam1)^2))
+rmse_gam2=sqrt(mean((yts-E_yhatgam2)^2))
+
+rmse_n1=sqrt(mean((yts-E_yhatn1)^2))
+rmse_n2=sqrt(mean((yts-E_yhatn2)^2))
+rmse_n3=sqrt(mean((yts-E_yhatn3)^2))
+
+# mean absolute error
+mae_glm1=mean(abs(yts-E_yhatglm1))
+mae_glm2=mean(abs(yts-E_yhatglm2))
+mae_glm3=mean(abs(yts-E_yhatglm3))
+
+mae_gam1=mean(abs(yts-E_yhatgam1))
+mae_gam2=mean(abs(yts-E_yhatgam2))
+
+mae_n1=mean(abs(yts-E_yhatn1))
+mae_n2=mean(abs(yts-E_yhatn2))
+mae_n3=mean(abs(yts-E_yhatn3))
+
+# table results
+OoS_validation=data.frame(
+  Model=c("GLM 1","GLM 2","GLM 3",
+          "GAM 1","GAM 2",
+          "Nmix 1","Nmix 2","Nmix 3"),
+  RMSE=c(rmse_glm1,rmse_glm2,rmse_glm3,
+           rmse_gam1,rmse_gam2,
+           rmse_n1,rmse_n2,rmse_n3),
+  MAE=c(mae_glm1,mae_glm2,mae_glm3,
+          mae_gam1,mae_gam2,
+          mae_n1,mae_n2,mae_n3))
+
+OoS_validation
+```
+
+<br>
+
+<br>
+
+We can consider the vectors of model errors to be a distribution and model their densities as a graphical check of model predictive accuracy:
+
+```{r}
+# root squared error
+rseglm1=sqrt(((yts-E_yhatglm1)^2))
+rseglm2=sqrt(((yts-E_yhatglm2)^2))
+rseglm3=sqrt(((yts-E_yhatglm3)^2))
+
+rsegam1=sqrt(((yts-E_yhatgam1)^2))
+rsegam2=sqrt(((yts-E_yhatgam2)^2))
+
+rsen1=sqrt(((yts-E_yhatn1)^2))
+rsen2=sqrt(((yts-E_yhatn2)^2))
+rsen3=sqrt(((yts-E_yhatn3)^2))
+
+# absolute error
+aeglm1=abs(yts-E_yhatglm1)
+aeglm2=abs(yts-E_yhatglm2)
+aeglm3=abs(yts-E_yhatglm3)
+
+aegam1=abs(yts-E_yhatgam1)
+aegam2=abs(yts-E_yhatgam2)
+
+aen1=abs(yts-E_yhatn1)
+aen2=abs(yts-E_yhatn2)
+aen3=abs(yts-E_yhatn3)
+```
+
+<br>
+
+For the purpose of defining plot axis limits it is convenient to find the maximum density for each model's error distribution:
+
+```{r}
+max_rse_dens=apply(cbind(density(rseglm1)$y,density(rseglm2)$y,
+                     density(rseglm3)$y,density(rsegam1)$y,
+                     density(rsegam2)$y,density(rsen1)$y,
+                     density(rsen2)$y,density(rsen3)$y),2,max)
+names(max_rse_dens)=c("GLM 1","GLM 2","GLM 3","GAM 1","GAM 2","N1","N2","N3")
+max_rse_dens
+```
+
+```{r}
+max_ae_dens=apply(cbind(density(aeglm1)$y,density(aeglm2)$y,
+                     density(aeglm3)$y,density(aegam1)$y,
+                     density(aegam2)$y,density(aen1)$y,
+                     density(aen2)$y,density(aen3)$y),2,max)
+names(max_ae_dens)=c("GLM 1","GLM 2","GLM 3","GAM 1","GAM 2","N1","N2","N3")
+max_ae_dens
+```
+
+<br>
+
+Then we can generate a series of comparative density plots for each model:
+
+```{r}
+plot(density(rsen1),col="#51288880",lwd=3,
+     xlab=TeX("$\\sqrt{\\sum (y - \\hat{y})^2 }$"),
+     main="N-Mixture Error Comparisons",
+     ylim=c(0,max_rse_dens[6]))
+lines(density(rsen2),col="#7E6E13",lwd=3,lty=3)
+lines(density(rsen3),col="#DBA40E",lwd=3,lty=3)
+```
+
+<br>
+
+```{r}
+plot(density(rsen1),col="#51288880",lwd=3,
+     xlab=TeX("$\\sqrt{\\sum (y - \\hat{y})^2 }$"),
+     main="N-Mix 1 vs. GLM Error Comparisons",
+     ylim=c(0,max_rse_dens[3]))
+lines(density(rseglm1),col="#CE3C10",lwd=3,lty=3)
+lines(density(rseglm2),col="#3D550C",lwd=3,lty=3)
+lines(density(rseglm3),col="#00FFFF80",lwd=3,lty=3)
+```
+
+<br>
+
+```{r}
+plot(density(rsen2),col="#DBA40E80",lwd=3,
+     xlab=TeX("$\\sqrt{\\sum (y - \\hat{y})^2 }$"),
+     main="N-Mix 2 vs. GLM Error Comparisons",
+     ylim=c(0,max_rse_dens[3]))
+lines(density(rseglm1),col="#CE3C10",lwd=3,lty=3)
+lines(density(rseglm2),col="#3D550C",lwd=3,lty=3)
+lines(density(rseglm3),col="#00FFFF80",lwd=3,lty=3)
+```
+
+<br>
+
+```{r}
+plot(density(rsen3),col="#FFA50080",lwd=3,
+     xlab=TeX("$\\sqrt{\\sum (y - \\hat{y})^2 }$"),
+     main="N-Mix 3 vs. GLM Error Comparisons",
+     ylim=c(0,max_rse_dens[3]))
+lines(density(rseglm1),col="#CE3C10",lwd=3,lty=3)
+lines(density(rseglm2),col="#3D550C",lwd=3,lty=3)
+lines(density(rseglm3),col="#00FFFF80",lwd=3,lty=3)
+```
+
+<br>
+
+```{r}
+plot(density(rsen1),col="#51288880",lwd=3,
+     xlab=TeX("$\\sqrt{\\sum (y - \\hat{y})^2 }$"),
+     main="Model Error Comparisons",
+     ylim=c(0,max_rse_dens[3]))
+lines(density(rsen2),col="#DBA40E",lwd=1,lty=1)
+lines(density(rsen3),col="#FFA500",lwd=1,lty=1)
+lines(density(rseglm1),col="#CE3C10",lwd=1,lty=1)
+lines(density(rseglm2),col="#3D550C",lwd=1,lty=1)
+lines(density(rseglm3),col="#00FFFF80",lwd=1,lty=1)
+lines(density(rsegam1),col="#B4F8C8",lwd=1,lty=1)
+lines(density(rsegam2),col="#E5A298",lwd=1,lty=1)
+```
+
+<br>
+
+Since absolute error is a simple hot swap of variable names we just include the total comparison plot:
+
+```{r}
+plot(density(aen1),col="#51288880",lwd=3,
+     xlab=TeX("$\\sum |y - \\hat{y}|$"),
+     main="Model Error Comparisons",
+     ylim=c(0,max_rse_dens[3]))
+lines(density(aen2),col="#DBA40E",lwd=1,lty=1)
+lines(density(aen3),col="#FFA500",lwd=1,lty=1)
+lines(density(aeglm1),col="#CE3C10",lwd=1,lty=1)
+lines(density(aeglm2),col="#3D550C",lwd=1,lty=1)
+lines(density(aeglm3),col="#00FFFF80",lwd=1,lty=1)
+lines(density(aegam1),col="#B4F8C8",lwd=1,lty=1)
+lines(density(aegam2),col="#E5A298",lwd=1,lty=1)
+```
+
+<br>
