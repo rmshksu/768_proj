@@ -1,0 +1,1425 @@
+---
+title: "Map Making"
+format: pdf
+editor: visual
+---
+
+### Loading Packages
+
+```{r}
+
+library(rstan)
+library(ggplot2)
+library(gapminder)
+library(cols4all)
+library(maps)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(corrr)
+library(latex2exp)
+
+
+```
+
+# Results Data Maps
+
+## Loading in data and shapefile
+
+```{r}
+#| echo: false
+mydata <- read.csv("C:/Users/gacas/Downloads/result.csv")
+states <- read_sf("C:/Users/gacas/Downloads/cb_2018_us_state_5m/cb_2018_us_state_5m.shp")
+
+```
+
+## Arrange Data by State
+
+```{r}
+mydata = mydata %>% arrange(STATE)
+states = states %>% arrange(STUSPS) %>% filter(STUSPS %in% unique(mydata$STATE))
+states = states %>% arrange(STUSPS)
+```
+
+## Making SF object and doing some data transformations
+
+```{r}
+
+
+dataset <- inner_join(mydata, states, by = c("STATE"="STUSPS"))
+dataset = sf::st_as_sf(dataset)
+dataset$GROSSDOMESTICPRODUCT = dataset$GROSSDOMESTICPRODUCT * 0.000001
+dataset$STATEGOVTAXCOLLECTIONSTOTALTAXES = dataset$STATEGOVTAXCOLLECTIONSTOTALTAXES * 0.000001
+dataset = dataset %>%
+  select(-c(GEOID, AFFGEOID, ALAND,AWATER,STATEFP,LSAD,NAME,STATENS))
+```
+
+## Data Quality Check
+
+```{r}
+# Checking to see if all the states match
+dataset$geometry[seq(from = 1, to = 450, by = 9)] == states$geometry
+
+
+```
+
+## Making datasets for each specific year
+
+```{r}
+
+
+## All this stuff is for making maps using result.csv
+
+dataset2014 <- dataset %>% filter(YEAR==2014) %>% as.data.frame()
+colnames(dataset2014)[1] <- "X2014"
+colnames(dataset2014)[3] <- "YEAR2014"
+colnames(dataset2014)[4] <- "RATE2014"
+colnames(dataset2014)[5] <- "DEATHS2014"
+colnames(dataset2014)[6] <- "POP2014"
+colnames(dataset2014)[7] <- "GDP2014"
+colnames(dataset2014)[8] <- "PCPI2014"
+colnames(dataset2014)[9] <- "HOR2014"
+colnames(dataset2014)[10] <- "PBDH2014"
+colnames(dataset2014)[11] <- "SGTaxes2014"
+
+
+
+dataset2015 <- dataset %>% filter(YEAR==2015) %>% as.data.frame()
+colnames(dataset2015)[1] <- "X2015"
+colnames(dataset2015)[3] <- "YEAR2015"
+colnames(dataset2015)[4] <- "RATE2015"
+colnames(dataset2015)[5] <- "DEATHS2015"
+colnames(dataset2015)[6] <- "POP2015"
+colnames(dataset2015)[7] <- "GDP2015"
+colnames(dataset2015)[8] <- "PCPI2015"
+colnames(dataset2015)[9] <- "HOR2015"
+colnames(dataset2015)[10] <- "PBDH2015"
+colnames(dataset2015)[11] <- "SGTaxes2015"
+
+
+dataset2016 <- dataset %>% filter(YEAR==2016) %>% as.data.frame()
+colnames(dataset2016)[1] <- "X2016"
+colnames(dataset2016)[3] <- "YEAR2016"
+colnames(dataset2016)[4] <- "RATE2016"
+colnames(dataset2016)[5] <- "DEATHS2016"
+colnames(dataset2016)[6] <- "POP2016"
+colnames(dataset2016)[7] <- "GDP2016"
+colnames(dataset2016)[8] <- "PCPI2016"
+colnames(dataset2016)[9] <- "HOR2016"
+colnames(dataset2016)[10] <- "PBDH2016"
+colnames(dataset2016)[11] <- "SGTaxes2016"
+
+
+dataset2017 <- dataset %>% filter(YEAR==2017) %>% as.data.frame()
+colnames(dataset2017)[1] <- "X2017"
+colnames(dataset2017)[3] <- "YEAR2017"
+colnames(dataset2017)[4] <- "RATE2017"
+colnames(dataset2017)[5] <- "DEATHS2017"
+colnames(dataset2017)[6] <- "POP2017"
+colnames(dataset2017)[7] <- "GDP2017"
+colnames(dataset2017)[8] <- "PCPI2017"
+colnames(dataset2017)[9] <- "HOR2017"
+colnames(dataset2017)[10] <- "PBDH2017"
+colnames(dataset2017)[11] <- "SGTaxes2017"
+
+
+dataset2018 <- dataset %>% filter(YEAR==2018) %>% as.data.frame()
+colnames(dataset2018)[1] <- "X2018"
+colnames(dataset2018)[3] <- "YEAR2018"
+colnames(dataset2018)[4] <- "RATE2018"
+colnames(dataset2018)[5] <- "DEATHS2018"
+colnames(dataset2018)[6] <- "POP2018"
+colnames(dataset2018)[7] <- "GDP2018"
+colnames(dataset2018)[8] <- "PCPI2018"
+colnames(dataset2018)[9] <- "HOR2018"
+colnames(dataset2018)[10] <- "PBDH2018"
+colnames(dataset2018)[11] <- "SGTaxes2018"
+
+
+
+dataset2019 <- dataset %>% filter(YEAR==2019) %>% as.data.frame()
+colnames(dataset2019)[1] <- "X2019"
+colnames(dataset2019)[3] <- "YEAR2019"
+colnames(dataset2019)[4] <- "RATE2019"
+colnames(dataset2019)[5] <- "DEATHS2019"
+colnames(dataset2019)[6] <- "POP2019"
+colnames(dataset2019)[7] <- "GDP2019"
+colnames(dataset2019)[8] <- "PCPI2019"
+colnames(dataset2019)[9] <- "HOR2019"
+colnames(dataset2019)[10] <- "PBDH2019"
+colnames(dataset2019)[11] <- "SGTaxes2019"
+
+
+
+dataset2020 <- dataset %>% filter(YEAR==2020) %>% as.data.frame()
+colnames(dataset2020)[1] <- "X2020"
+colnames(dataset2020)[3] <- "YEAR2020"
+colnames(dataset2020)[4] <- "RATE2020"
+colnames(dataset2020)[5] <- "DEATHS2020"
+colnames(dataset2020)[6] <- "POP2020"
+colnames(dataset2020)[7] <- "GDP2020"
+colnames(dataset2020)[8] <- "PCPI2020"
+colnames(dataset2020)[9] <- "HOR2020"
+colnames(dataset2020)[10] <- "PBDH2020"
+colnames(dataset2020)[11] <- "SGTaxes2020"
+
+
+
+dataset2021 <- dataset %>% filter(YEAR==2021) %>% as.data.frame()
+colnames(dataset2021)[1] <- "X2021"
+colnames(dataset2021)[3] <- "YEAR2021"
+colnames(dataset2021)[4] <- "RATE2021"
+colnames(dataset2021)[5] <- "DEATHS2021"
+colnames(dataset2021)[6] <- "POP2021"
+colnames(dataset2021)[7] <- "GDP2021"
+colnames(dataset2021)[8] <- "PCPI2021"
+colnames(dataset2021)[9] <- "HOR2021"
+colnames(dataset2021)[10] <- "PBDH2021"
+colnames(dataset2021)[11] <- "SGTaxes2021"
+
+
+dataset2022 <- dataset %>% filter(YEAR==2022) %>% as.data.frame()
+colnames(dataset2022)[1] <- "X2022"
+colnames(dataset2022)[3] <- "YEAR2022"
+colnames(dataset2022)[4] <- "RATE2022"
+colnames(dataset2022)[5] <- "DEATHS2022"
+colnames(dataset2022)[6] <- "POP2022"
+colnames(dataset2022)[7] <- "GDP2022"
+colnames(dataset2022)[8] <- "PCPI2022"
+colnames(dataset2022)[9] <- "HOR2022"
+colnames(dataset2022)[10] <- "PBDH2022"
+colnames(dataset2022)[11] <- "SGTaxes2022"
+
+```
+
+## Creating full_dataset dataframe to make maps of results.csv
+
+```{r}
+
+
+full_dataset <- full_join(dataset2014,dataset2015, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2016, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2017, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2018, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2019, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2020, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2021, by = c("STATE","geometry"))
+full_dataset = full_dataset %>% full_join(dataset2022, by = c("STATE","geometry"))
+full_dataset = st_as_sf(full_dataset)
+
+# Checking if geometry is the same for the states
+full_dataset$geometry == states$geometry
+```
+
+## Map Making Examples for results.csv
+
+```{r}
+# Removing Alaska and Hawaii
+tm_shape(full_dataset[-c(1,11),])  +
+  tm_polygons(
+    fill = c("GDP2014","GDP2015","GDP2016","GDP2017","GDP2018","GDP2019","GDP2020","GDP2021","GDP2022"),
+    fill.legend = tm_legend(
+      title = "Trillions of Dollars"
+    ),
+    fill.free = FALSE,
+    fill.scale = tm_scale_intervals(n=10)
+  ) + 
+  tm_title("Gross Domestic Product")
+
+```
+
+```{r}
+tm_shape(full_dataset[-c(1,11),]) +
+  tm_polygons(
+    fill = c("PCPI2014","PCPI2015","PCPI2016","PCPI2017","PCPI2018","PCPI2019","PCPI2020","PCPI2021","PCPI2022"),
+    fill.legend = tm_legend(
+      title = "Per Capita Personal Income (USD)"
+    ),
+    fill.free = FALSE,
+    fill.scale = tm_scale_intervals(n=10)
+  ) +
+  tm_title("Per Capita Personal Income")
+
+```
+
+```{r}
+tm_shape(full_dataset[-c(1,11),]) +
+  tm_polygons(
+    fill = c("PBDH2014","PBDH2015","PBDH2016","PBDH2017","PBDH2018","PBDH2019","PBDH2020","PBDH2021","PBDH2022"),
+    fill.legend = tm_legend(
+      title = "Percent with Bachelor's or Higher (%)"
+    ),
+    fill.free = FALSE,
+    fill.scale = tm_scale_intervals(n=10)
+  ) +
+  tm_title("Percent with Bachelor's Degree or Higher")
+```
+
+```{r}
+tm_shape(full_dataset[-c(1,11),]) +
+  tm_polygons(
+    fill = c("RATE2022"),
+    fill.legend = tm_legend(
+      title = "Persons per 100,000 People"
+    ),
+    fill.free = FALSE,
+    fill.scale = tm_scale_intervals()
+  ) +
+  tm_title("Overdose Death Rate")
+
+```
+
+# Models Data
+
+## Data loading (samples 1-3 from doc_fent_fent)
+
+```{r}
+
+model1.samples <- samples1
+model2.samples <- samples2
+model3.samples <- samples3
+
+```
+
+## Converting samples from matrix to df
+
+```{r}
+
+model1.samples = as.data.frame(matrix(unlist(model1.samples), nrow = 9000, byrow = F))
+model2.samples = as.data.frame(matrix(unlist(model2.samples), nrow = 9000, byrow = F))
+model3.samples = as.data.frame(matrix(unlist(model3.samples), nrow = 9000, byrow = F))
+
+```
+
+## Data Quality Check
+
+```{r}
+states$STUSPS == data$STATE[seq(from=1,to=450,by=9)]
+
+```
+
+## Creating Column names for all three model 1-3 samples
+
+```{r}
+
+colnames(model1.samples) <- c(paste0("gamma0",states$STUSPS),paste0("p",states$STUSPS))
+colnames(model2.samples) <- c(
+  paste0("gamma0",states$STUSPS),
+  paste0("gamma1",states$STUSPS),
+  paste0("gamma2",states$STUSPS),
+  paste0("gamma3",states$STUSPS),
+  paste0("p",states$STUSPS)
+)
+colnames(model3.samples) <- c(
+  paste0("gamma0",states$STUSPS),
+  paste0("gamma1",states$STUSPS),
+  paste0("gamma2",states$STUSPS),
+  paste0("gamma3",states$STUSPS),
+  paste0("h",states$STUSPS),
+  paste0("p",states$STUSPS)
+)
+
+```
+
+## Calculating posterior summaries of each model
+
+```{r}
+
+model1.samples.means <- apply(model1.samples, MARGIN = 2, mean)
+model1.samples.medians <- apply(model1.samples, MARGIN = 2, median)
+model1.samples.lower5 <- apply(model1.samples, MARGIN = 2, FUN = quantile, prob = 0.05)
+model1.samples.upper5 <- apply(model1.samples, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+model2.samples.means <- apply(model2.samples, MARGIN = 2, mean)
+model2.samples.medians <- apply(model2.samples, MARGIN = 2, median)
+model2.samples.lower5 <- apply(model2.samples, MARGIN = 2, FUN = quantile, prob = 0.05)
+model2.samples.upper5 <- apply(model2.samples, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+model3.samples.means <- apply(model3.samples, MARGIN = 2, mean)
+model3.samples.medians <- apply(model3.samples, MARGIN = 2, median)
+model3.samples.lower5 <- apply(model3.samples, MARGIN = 2, FUN = quantile, prob = 0.05)
+model3.samples.upper5 <- apply(model3.samples, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+```
+
+## Creating dataframes from the posterior summaries for each model
+
+```{r}
+
+
+full.model1.parameters <- data.frame(
+  Model1.Means = model1.samples.means,
+  Model1.Medians = model1.samples.medians,
+  Model1.upper5 = model1.samples.upper5,
+  Model1.lower5 = model1.samples.lower5
+)
+
+full.model2.parameters <- data.frame(
+  Model2.Means = model2.samples.means,
+  Model2.Medians = model2.samples.medians,
+  Model2.upper5 = model2.samples.upper5,
+  Model2.lower5 = model2.samples.lower5
+)
+
+full.model3.parameters <- data.frame(
+  Model3.Means = model3.samples.means,
+  Model3.Medians = model3.samples.medians,
+  Model3.upper5 = model3.samples.upper5,
+  Model3.lower5 = model3.samples.lower5
+)
+
+```
+
+## Adding States to each dataframe as a variable
+
+```{r}
+
+
+full.model1.parameters$State <- states$STUSPS
+full.model2.parameters$State <- states$STUSPS
+full.model3.parameters$State <- states$STUSPS
+
+# Removing rownames
+
+rownames(full.model1.parameters) <- NULL
+rownames(full.model2.parameters) <- NULL
+rownames(full.model3.parameters) <- NULL
+
+```
+
+## Data Quality Check
+
+```{r}
+
+class(full.model1.parameters)
+class(full.model2.parameters)
+class(full.model3.parameters)
+colnames(full.model1.parameters)
+colnames(full.model2.parameters)
+colnames(full.model3.parameters)
+dim(full.model1.parameters)
+dim(full.model2.parameters)
+dim(full.model3.parameters)
+```
+
+## Adding a column variable to represent the parameter in each model dataframe
+
+```{r}
+
+full.model1.parameters$Parameter <- c(
+  rep(paste0("gamma0"),times=50),
+  rep(paste0("p"),times=50)
+)
+
+full.model2.parameters$Parameter <- c(
+  rep(paste0("gamma0"),times=50),
+  rep(paste0("gamma1"),times=50),
+  rep(paste0("gamma2"),times=50),
+  rep(paste0("gamma3"),times=50),
+  rep(paste0("p"),times=50)
+)
+
+full.model3.parameters$Parameter <- c(
+  rep(paste0("gamma0"),times=50),
+  rep(paste0("gamma1"),times=50),
+  rep(paste0("gamma2"),times=50),
+  rep(paste0("gamma3"),times=50),
+  rep(paste0("h"),times=50),
+  rep(paste0("p"),times=50)
+)
+```
+
+## Data Quality Check
+
+```{r}
+
+class(full.model1.parameters)
+class(full.model2.parameters)
+class(full.model3.parameters)
+colnames(full.model1.parameters)
+colnames(full.model2.parameters)
+colnames(full.model3.parameters)
+dim(full.model1.parameters)
+dim(full.model2.parameters)
+dim(full.model3.parameters)
+```
+
+## Adding the Range Column which is the difference between the 95% and the 5% of the credible intervals
+
+```{r}
+full.model1.parameters$Range <- full.model1.parameters$Model1.upper5 - full.model1.parameters$Model1.lower5
+
+full.model2.parameters$Range <- full.model2.parameters$Model2.upper5 - full.model2.parameters$Model2.lower5
+
+full.model3.parameters$Range <- full.model3.parameters$Model3.upper5 - full.model3.parameters$Model3.lower5
+
+```
+
+## Separating dataframes into specific parameters
+
+```{r}
+full.model1.dataframe <- split(full.model1.parameters, f = full.model1.parameters$Parameter)
+
+full.model2.dataframe <- split(full.model2.parameters, f = full.model2.parameters$Parameter)
+
+full.model3.dataframe <- split(full.model3.parameters, f = full.model3.parameters$Parameter)
+```
+
+## Adding spatial data component to each model
+
+```{r}
+
+# Creating temp object
+temp <- states %>% select(STUSPS, geometry)
+
+full.model1.sf <- lapply(X = full.model1.dataframe, y = temp, inner_join, by = c("State"="STUSPS"))
+
+full.model2.sf <- lapply(X = full.model2.dataframe, y = temp, inner_join, by = c("State" = "STUSPS"))
+
+full.model3.sf <- lapply(X = full.model3.dataframe, y = temp, inner_join, by = c("State" = "STUSPS"))
+
+
+```
+
+## Data Quality Check
+
+```{r}
+lapply(full.model1.sf, FUN = class)
+lapply(full.model2.sf, FUN = class)
+lapply(full.model3.sf, FUN = class)
+lapply(full.model1.sf, FUN = dim)
+lapply(full.model2.sf, FUN = dim)
+lapply(full.model3.sf, FUN = dim)
+lapply(full.model1.sf, FUN = colnames)
+lapply(full.model2.sf, FUN = colnames)
+lapply(full.model3.sf, FUN = colnames)
+lapply(full.model1.sf, FUN = rownames)
+lapply(full.model2.sf, FUN = rownames)
+lapply(full.model3.sf, FUN = rownames)
+
+```
+
+## Converting to sf dataframes
+
+```{r}
+
+full.model1.sf = lapply(full.model1.sf, FUN = sf::st_as_sf)
+full.model2.sf = lapply(full.model2.sf, FUN = sf::st_as_sf)
+full.model3.sf = lapply(full.model3.sf, FUN = sf::st_as_sf)
+
+
+```
+
+## Data Quality Check
+
+```{r}
+lapply(full.model1.sf, FUN = class)
+lapply(full.model2.sf, FUN = class)
+lapply(full.model3.sf, FUN = class)
+lapply(full.model1.sf, FUN = dim)
+lapply(full.model2.sf, FUN = dim)
+lapply(full.model3.sf, FUN = dim)
+lapply(full.model1.sf, FUN = colnames)
+lapply(full.model2.sf, FUN = colnames)
+lapply(full.model3.sf, FUN = colnames)
+lapply(full.model1.sf, FUN = rownames)
+lapply(full.model2.sf, FUN = rownames)
+lapply(full.model3.sf, FUN = rownames)
+```
+
+# Map Making Model Examples
+
+## Model 3
+
+### Gamma0 Model 3 (Posterior Mean)
+
+```{r}
+
+tm_shape(full.model3.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma1 Model 3 (Posterior Mean)
+
+```{r}
+tm_shape(full.model3.sf$gamma1[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_1$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma2 Model 3 (Posterior Mean)
+
+```{r}
+tm_shape(full.model3.sf$gamma2[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_2$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma3 Model 3 (Posterior Mean)
+
+```{r}
+tm_shape(full.model3.sf$gamma3[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_3$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### h Parameter Model 3 (Posterior Mean)
+
+```{r}
+tm_shape(full.model3.sf$h[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\h$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+## Difference between 95% and 5% of the credible intervals for each parameter
+
+### Gamma0 Model 3 (Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma1 Model 3 (Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$gamma1[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_1$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma2 Model 3 (Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$gamma2[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_2$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma3 Model 3 (Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$gamma3[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_3$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### h Parameter Model 3 (Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$h[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\h$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+## Model 2
+
+### Gamma0 Model 2 (Posterior Mean)
+
+```{r}
+tm_shape(full.model2.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma1 Model 2 (Posterior Mean)
+
+```{r}
+tm_shape(full.model2.sf$gamma1[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_1$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma2 Model 2 (Posterior Mean)
+
+```{r}
+tm_shape(full.model2.sf$gamma2[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_2$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma3 Model 2(Posterior Mean)
+
+```{r}
+tm_shape(full.model2.sf$gamma3[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_3$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+## Difference between 95% and 5% of the credible intervals for each parameter
+
+### Gamma0 Model 2 (Measure of Variability)
+
+```{r}
+tm_shape(full.model2.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma1 Model 2 (Measure of Variability)
+
+```{r}
+tm_shape(full.model2.sf$gamma1[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_1$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma2 Model 2 (Measure of Variability)
+
+```{r}
+tm_shape(full.model2.sf$gamma2[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_2$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma3 Model 2(Measure of Variability)
+
+```{r}
+tm_shape(full.model3.sf$gamma3[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_3$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+## Model 1
+
+### Gamma0 Model 1 (Posterior Mean)
+
+```{r}
+tm_shape(full.model1.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model1.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Effect Size",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Gamma0 Model 1 (Measure of Variability)
+
+```{r}
+tm_shape(full.model1.sf$gamma0[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Range",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "90% Interpercentile Range",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\gamma_0$"),
+    position = c("top", "center"),
+    frame = F
+  ) + tm_layout(
+    inner.margins = c(0.3,0.1,0.2,0.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+## Posterior Prediction
+
+### Loading in Data
+
+```{r}
+
+# Data cleaning for postpred1, postpred2, postpred3
+
+postpred1 <- as.data.frame(post_pred1)
+postpred2 <- as.data.frame(post_pred2)
+postpred3 <- as.data.frame(post_pred3)
+
+postpred1 = t(postpred1)
+postpred2 = t(postpred2)
+colnames(postpred2) <- c(
+  states$STUSPS, 
+  states$STUSPS,
+  states$STUSPS,
+  states$STUSPS
+)
+postpred3 = t(postpred3)
+colnames(postpred3) <- c(
+  states$STUSPS,
+  states$STUSPS,
+  states$STUSPS,
+  states$STUSPS
+)
+
+
+```
+
+### Some more data cleaning
+
+```{r}
+
+rownames(postpred1) <- NULL
+rownames(postpred2) <- NULL
+rownames(postpred3) <- NULL
+
+postpred1 = as.data.frame(postpred1)
+postpred2 = as.data.frame(postpred2)
+postpred3 = as.data.frame(postpred3)
+```
+
+### Calculating Posterior Means
+
+```{r}
+
+
+model1.postpred.means <- apply(postpred1, MARGIN = 2, mean)
+model1.postpred.medians <- apply(postpred1, MARGIN = 2, median)
+model1.postpred.lower5 <- apply(postpred1, MARGIN = 2, FUN = quantile, prob = 0.05)
+model1.postpred.upper5 <- apply(postpred1, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+model2.postpred.means <- apply(postpred2, MARGIN = 2, mean)
+model2.postpred.medians <- apply(postpred2, MARGIN = 2, median)
+model2.postpred.lower5 <- apply(postpred2, MARGIN = 2, FUN = quantile, prob = 0.05)
+model2.postpred.upper5 <- apply(postpred2, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+model3.postpred.means <- apply(postpred3, MARGIN = 2, mean)
+model3.postpred.medians <- apply(postpred3, MARGIN = 2, median)
+model3.postpred.lower5 <- apply(postpred3, MARGIN = 2, FUN = quantile, prob = 0.05)
+model3.postpred.upper5 <- apply(postpred3, MARGIN = 2, FUN = quantile, prob = 0.95)
+
+```
+
+### Getting dataframes for posterior prediction
+
+```{r}
+
+
+full.model1.postpred <- data.frame(
+  Model1.Means = model1.postpred.means,
+  Model1.Medians = model1.postpred.medians,
+  Model1.upper5 = model1.postpred.upper5,
+  Model1.lower5 = model1.postpred.lower5
+)
+
+full.model2.postpred <- data.frame(
+  Model2.Means = model2.postpred.means,
+  Model2.Medians = model2.postpred.medians,
+  Model2.upper5 = model2.postpred.upper5,
+  Model2.lower5 = model2.postpred.lower5
+)
+
+full.model3.postpred <- data.frame(
+  Model3.Means = model3.postpred.means,
+  Model3.Medians = model3.postpred.medians,
+  Model3.upper5 = model3.postpred.upper5,
+  Model3.lower5 = model3.postpred.lower5
+)
+
+
+```
+
+### Data quality check
+
+```{r}
+dim(full.model1.postpred)
+dim(full.model2.postpred)
+dim(full.model3.postpred)
+```
+
+### Adding States Column
+
+```{r}
+
+full.model1.postpred$State = states$STUSPS
+full.model2.postpred$State = states$STUSPS
+full.model3.postpred$State = states$STUSPS
+
+```
+
+### Data Quality Check
+
+```{r}
+dim(full.model1.postpred)
+dim(full.model2.postpred)
+dim(full.model3.postpred)
+```
+
+### Turning dataframes into spatial objects
+
+```{r}
+
+
+temp <- states %>% select(STUSPS, geometry)
+
+full.model1.postpred = inner_join(full.model1.postpred, temp, by = c("State"="STUSPS"))
+full.model1.postpred = sf::st_as_sf(full.model1.postpred)
+
+
+full.model2.postpred = inner_join(full.model2.postpred, temp, by = c("State"="STUSPS"))
+full.model2.postpred = sf::st_as_sf(full.model2.postpred)
+
+
+full.model3.postpred = inner_join(full.model3.postpred, temp, by = c("State"="STUSPS"))
+full.model3.postpred = sf::st_as_sf(full.model3.postpred)
+```
+
+### Data Quality Check
+
+```{r}
+
+dim(full.model1.postpred)
+dim(full.model2.postpred)
+dim(full.model3.postpred)
+class(full.model1.postpred)
+class(full.model2.postpred)
+class(full.model3.postpred)
+View(full.model1.postpred)
+```
+
+## Example maps
+
+### Model 1
+
+```{r}
+tm_shape(full.model1.postpred[-c(1,11),]) + 
+  tm_polygons(
+    fill = "Model1.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2019-2022$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 2: 2019
+
+```{r}
+
+tm_shape(full.model2.postpred[c(2:10,12:50),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2019$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+
+```
+
+### Model 2: 2020
+
+```{r}
+tm_shape(full.model2.postpred[c(52:60,62:100),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2020$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 2: 2021
+
+```{r}
+tm_shape(full.model2.postpred[c(102:110,112:150),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2021$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 2: 2022
+
+```{r}
+tm_shape(full.model2.postpred[c(152:160,162:200),]) + 
+  tm_polygons(
+    fill = "Model2.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2022$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 3: 2019
+
+```{r}
+
+tm_shape(full.model3.postpred[c(2:10,12:50),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2019$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 3: 2020
+
+```{r}
+
+tm_shape(full.model3.postpred[c(52:60,62:100),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2020$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 3: 2021
+
+```{r}
+tm_shape(full.model3.postpred[c(102:110,112:150),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2021$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
+
+### Model 3: 2022
+
+```{r}
+tm_shape(full.model3.postpred[c(152:160,162:200),]) + 
+  tm_polygons(
+    fill = "Model3.Means",
+    fill.scale = tm_scale_intervals(values = "brewer.purples"),
+    fill.legend = tm_legend(
+      title = "Estimated Counts",
+      orientation = "landscape",
+      position = c("bottom"),
+      title.fontfamily = "serif"
+    )
+  ) +
+  tm_title(
+    text = TeX("Parameter: $\\E[N|\\cdot]:2022$"),
+    position = c("top", "center"),
+    frame = F
+  ) +  tm_layout(
+    inner.margins = c(0.3,0.1,0.2,.1),
+    frame = F,
+    component.autoscale = F
+  )
+```
